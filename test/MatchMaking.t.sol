@@ -11,18 +11,34 @@ contract MatchMakingTest is Test {
         mmContract = new MatchMaking();
     }
 
-    function testRequest() public{
-        mmContract.requestMatch();
-        MatchMaking.MatchDetail memory d = mmContract.getMatchDetail(0);
-        console2.log("Get match details:");
+    function testQuickMatch() public{
+        mmContract.quickMatch();
+
+        uint256 cur_id = mmContract.matchId();
+        console2.log("Current ID count:", cur_id, "\n");
+
+        MatchMaking.MatchDetail memory d = mmContract.getMatchDetail(cur_id - 1);
+        console2.log("Get match details of id", cur_id - 1);
         console2.log(d.player1);
         console2.log(d.player2);
         console2.log(d.waiting);
         console2.log(d.started);
+        console2.log(d.matchWith);
+        console2.log(d.winner, "\n");
 
-        console2.log("Current ID count:", mmContract.matchId());
+        vm.prank(vm.addr(1));
+        mmContract.quickMatch();
+        cur_id = mmContract.matchId();
 
-        console2.log(mmContract.myMatches(address(this), 0));
-        mmContract.getMatches(address(this));
+        console2.log("Current ID count:", cur_id, "\n");
+
+        d = mmContract.getMatchDetail(cur_id - 1);
+        console2.log("Get match details of id", cur_id - 1);
+        console2.log(d.player1);
+        console2.log(d.player2);
+        console2.log(d.waiting);
+        console2.log(d.started);
+        console2.log(d.matchWith);
+        console2.log(d.winner, "\n");
     }
 }

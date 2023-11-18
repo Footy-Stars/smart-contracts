@@ -2,11 +2,12 @@
 pragma solidity ^0.8.20;
 
 contract MatchMaking {
-	uint256 public matchId;
-	uint256 public numPending;
-	uint256[] public pendingMatches;
 
-	uint256 private pendingPointer;
+	uint256 public matchId;
+
+	// 1v1 game will instand match if there's one pending
+	uint256 public waitingMatchId;
+	bool public waitingMatch;
 
 	mapping(uint256 => MatchDetail) public matchDetail;
 	mapping(address => uint256[]) public myMatches;
@@ -17,37 +18,49 @@ contract MatchMaking {
 		bool waiting;
 		bool started;
 		uint256 matchWith;
+		address winner;
 	}
 
-	constructor() {}
+	constructor() {
+		matchId = 1; // have to reserve 0 for default no match
+	}
 
-	function requestMatch() external {
-		matchDetail[matchId] = MatchDetail(msg.sender, address(0), true, false, 0); // have to reserve 0 for default no match
-		myMatches[msg.sender].push(matchId);
+	function quickMatch() external {
+		matchDetail[matchId] = MatchDetail(msg.sender, address(0), true, false, 0, address(0)); 
 
-		if (numPending) {
+		if (waitingMatch) {
 			_matchGame(matchId);
 		} else {
-			pendingMatches.push(matchId);
-			numPending++;
+			waitingMatchId = matchId;
+			waitingMatch = true;
 		}
 
+		myMatches[msg.sender].push(matchId);
 		matchId++;
 	}
 
 	function _matchGame(uint256 _id) private {
-		if (pendingPointer == pendingMatches.length) pendingPointer = 0;
-		MatchDetail storage m1 = matchDetail[pendingMatches[pendingPointer]];
+		MatchDetail storage m1 = matchDetail[waitingMatchId];
 		MatchDetail storage m2 = matchDetail[_id];
 
-		m1 = MatchDetail(m1.player1, m2.player1, false, true, _id);
-		m2 = MatchDetail(m2.player1, m1.player1, false, true, pendingMatches[pendingPointer]);
+		// Player 1 match details (The waiting player)
+		m1.player2 = m2.player1;
+		m1.waiting = false;
+		m1.started = true;
+		m1.matchWith = _id;
 
-		// remove pending match
-		pendingMatches[pendingPointer] = 0;
-		pendingPointer++;
+		// Player 2 match details
+		m2.player2 = m1.player1;
+		m2.waiting = false;
+		m2.started = true;
+		m1.matchWith = waitingMatchId;
+
+		// resetting match waiting
+		waitingMatchId = 0;
+		waitingMatch = false;
 	}
 
+	// ================================================View Functions================================================
 	function getMatchDetail(uint256 _id) external view returns (MatchDetail memory) {
 		return matchDetail[_id];
 	}
