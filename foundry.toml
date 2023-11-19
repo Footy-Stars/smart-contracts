@@ -9,6 +9,7 @@ remappings = [
 
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
+gnosis = "${GNOSIS_RPC_URL}"
 
 [etherscan]
 sepolia = { key = "ETHERSCAN_SEPOLIA_KEY", url = "https://api-sepolia.etherscan.io/api" }
