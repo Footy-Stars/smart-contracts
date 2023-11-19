@@ -4,6 +4,8 @@ pragma solidity ^0.8.13;
 import {Script, console2} from "forge-std/Script.sol";
 import {MatchMaking} from "../src/MatchMaking.sol";
 import {PlayerConfig} from "../src/PlayerConfig.sol";
+import {QrngExample} from "../src/Qrng.sol";
+import {Halo2Verifier} from "../src/Verifier.sol";
 
 contract DeployScript is Script {
     MatchMaking mmContract;
@@ -24,6 +26,7 @@ contract DeployScript is Script {
         // mmContract.finishMatch(4, 2, 5, 5);
 
         pcContract = new PlayerConfig();
+
         vm.stopBroadcast();
     }
 }

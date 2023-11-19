@@ -5,6 +5,7 @@ libs = ["lib"]
 
 remappings = [
     "@openzeppelin/=lib/openzeppelin-contracts",
+    "@api3/airnode-protocol/=lib/airnode/packages/airnode-protocol/",
 ]
 
 [rpc_endpoints]
