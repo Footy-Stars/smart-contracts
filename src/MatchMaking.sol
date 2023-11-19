@@ -6,24 +6,30 @@ contract MatchMaking {
 	uint256 constant SCALE = 100;
 
 	uint256 public matchId;
-	// 1v1 game will instand match if there's one pending
-	uint256 public waitingMatchId;
-	bool public waitingMatch;
+	uint256 public waitingMatchId; // 1v1 game will instant match if there's one pending
 	uint256[6] public wagerPayoffRate;
 
 	mapping(uint256 => MatchDetail) public matchDetail;
 	mapping(address => uint256[]) public myMatches;
 	mapping(uint256 => mapping(uint256 => WagerResult)) public wagerResult; // finalized wager
+	mapping(address => uint256) balance; // balance to withdraw
+
+	enum STATUS {
+		NONE,
+		WAITING,
+		STARTED,
+		ENDED
+	}
 
 	struct MatchDetail {
 		address player1;
 		address player2;
 		uint256 wager;
-		bool waiting;
-		bool started;
+		STATUS status;
 		uint256 matchWith;
 		address winner;
 		uint256 winningWager;
+		bool is_draw;
 	}
 
 	struct WagerResult {
@@ -35,14 +41,15 @@ contract MatchMaking {
 
 	event MatchCreated(uint256 matchId, address player, MatchDetail matchDetail);
 	event GameMatched(address player1, address player2, MatchDetail matchDetail1, MatchDetail matchDetail2);
-	event WinningResult(uint256 id, address winner, MatchDetail matchDetail, WagerResult wagerResult);
+	event WinningResult(uint256 id, MatchDetail matchDetail, WagerResult wagerResult);
+	event WinningScore(uint256 id, address winner, uint256 score1, uint256 score2);
+	event Withdraw(address to, uint256 amount);
 
 	error UnknownWinner();
 
 	constructor() {
 		matchId = 1; // have to reserve 0 for default no match
-		// Initialize wagerPayoffRate
-		wagerPayoffRate[1] = 30;
+		wagerPayoffRate[1] = 30; // Initialize wagerPayoffRate, 0 is 0
 		wagerPayoffRate[2] = 55;
 		wagerPayoffRate[3] = 75;
 		wagerPayoffRate[4] = 90;
@@ -51,14 +58,11 @@ contract MatchMaking {
 
 	// Have to send wager along with the function call
 	function quickMatch() external payable {
-		matchDetail[matchId] = MatchDetail(msg.sender, address(0), msg.value, true, false, 0, address(0), 0); // init new match
+		require(msg.value != 0, "No wager");
+		matchDetail[matchId] = MatchDetail(msg.sender, address(0), msg.value, STATUS.NONE, 0, address(0), 0, false); // init new match
 
-		if (waitingMatch) {
-			_matchGame(matchId);
-		} else {
-			waitingMatchId = matchId;
-			waitingMatch = true;
-		}
+		if (waitingMatchId != 0) _matchGame(matchId);
+		else waitingMatchId = matchId;
 
 		myMatches[msg.sender].push(matchId);
 		emit MatchCreated(matchId, msg.sender, matchDetail[matchId]);
@@ -71,31 +75,32 @@ contract MatchMaking {
 		MatchDetail storage m2 = matchDetail[_id];
 
 		require(m1.wager == m2.wager, "Different wager");
+		require(m1.player1 != m2.player1, "Cannot match with self");
 
 		// Player 1 match details (The waiting player)
 		m1.player2 = m2.player1;
-		m1.waiting = false;
-		m1.started = true;
+		m1.status = STATUS.STARTED;
 		m1.matchWith = _id;
 
 		// Player 2 match details
 		m2.player2 = m1.player1;
-		m2.waiting = false;
-		m2.started = true;
-		m1.matchWith = waitingMatchId;
+		m2.status = STATUS.STARTED;
+		m2.matchWith = waitingMatchId;
 
 		// resetting match waiting
 		waitingMatchId = 0;
-		waitingMatch = false;
 
 		emit GameMatched(m1.player1, m1.player2, m1, m2);
 	}
 
-	// @param _winner is either 1 or 2
-	function finishMatch(uint256 _id, uint256 _winner, uint256 _scoreDiff) external {
+	/* 
+	** @param _winner is either 1 or 2
+	*/ 
+	function finishMatch(uint256 _id, uint256 _winner, uint256 _score1, uint256 _score2) external {
 		// IMPORTANT: verify result proof
 		MatchDetail storage m = matchDetail[_id];
-		require(m.started == true);
+		MatchDetail storage m2 = matchDetail[m.matchWith];
+		require(m.status == STATUS.STARTED);
 
 		// get winner address
 		address winner;
@@ -104,12 +109,18 @@ contract MatchMaking {
 		else revert UnknownWinner();
 
 		m.winner = winner;
-		matchDetail[m.matchWith].winner = winner; // repeat for duplicated matchId
+		m.status = STATUS.ENDED;
+		m2.winner = winner; // repeat for duplicated matchId
+		m2.status = STATUS.ENDED;
 
 		// Getting payoff rate
 		uint256 rate;
-		if (_scoreDiff >= 5) rate = 5;
-		else rate = _scoreDiff;
+		uint256 scoreDiff;
+		if (_score1 > _score2) scoreDiff = _score1 - _score2;
+		else scoreDiff = _score2 - _score1;
+
+		if (scoreDiff >= 5) rate = 5;
+		else rate = scoreDiff;
 
 		// Reuse memory for rate
 		uint256 amount1;
@@ -119,15 +130,36 @@ contract MatchMaking {
 			amount1 = m.wager + (m.wager * rate * SCALE / SCALE / 100);
 			amount2 = m.wager - (m.wager * rate * SCALE / SCALE / 100);
 			m.winningWager = amount1;
+			m2.winningWager = amount1;
 		} else {
 			amount1 = m.wager - (m.wager * rate * SCALE / SCALE / 100);
 			amount2 = m.wager + (m.wager * rate * SCALE / SCALE / 100);
 			m.winningWager = amount2;
+			m2.winningWager = amount2;
 		}
 		wagerResult[_id][m.matchWith] = WagerResult(m.player1, amount1, m.player2, amount2); 
 		wagerResult[m.matchWith][_id] = WagerResult(m.player1, amount1, m.player2, amount2); // Repeat for be compatible both way
 
-		emit WinningResult(_id, m.winner, wagerResult[_id][m.matchWith]);
+		if (scoreDiff == 0) {
+			m.is_draw = true;
+			m2.is_draw = true;
+		}
+
+		balance[m.player1] += amount1;
+		balance[m.player2] += amount2;
+		emit WinningResult(_id, m, wagerResult[_id][m.matchWith]);
+		emit WinningScore(_id, m.winner, _score1, _score2);
+	}
+
+	function withdraw(address _to) external {
+		uint256 amount = balance[_to];
+		require(amount != 0, "No balance to withdraw");
+		balance[_to] = 0; // setting back to 0
+
+		(bool s, ) = _to.call{value: amount}("");
+		require(s, "Failed to withdraw");
+
+		emit Withdraw(_to, amount);
 	}
 
 	// ================================================View Functions================================================

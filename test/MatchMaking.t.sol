@@ -21,8 +21,6 @@ contract MatchMakingTest is Test {
         console2.log("Get match details of id", cur_id - 1);
         console2.log(d.player1);
         console2.log(d.player2);
-        console2.log(d.waiting);
-        console2.log(d.started);
         console2.log(d.matchWith);
         console2.log(d.winner, "\n");
 
@@ -37,14 +35,12 @@ contract MatchMakingTest is Test {
         console2.log("Get match details of id", cur_id - 1);
         console2.log(d.player1);
         console2.log(d.player2);
-        console2.log(d.waiting);
-        console2.log(d.started);
         console2.log(d.matchWith);
         console2.log(d.winner, "\n");
     }
 
     function testWinner() public {
         testQuickMatch();
-        mmContract.finishMatch(1, 1, 8);
+        mmContract.finishMatch(1, 1, 8, 4);
     }
 }

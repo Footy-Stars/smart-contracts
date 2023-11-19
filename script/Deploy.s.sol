@@ -14,8 +14,9 @@ contract DeployScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // mmContract = new MatchMaking();
-        mmContract = MatchMaking(0x41f9D7084f99B68FB5D5a0b5b2e249b577Fe25e2);
-        mmContract.quickMatch();
+        mmContract = MatchMaking(0x62125dB2DA783f390CcE30cc354f97c316C62208);
+        mmContract.quickMatch{value: 100}();
+        // mmContract.quickMatch{value: 100}();
 
         vm.stopBroadcast();
     }
