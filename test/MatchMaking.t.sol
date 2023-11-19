@@ -17,7 +17,9 @@ contract MatchMakingTest is Test {
         uint256 cur_id = mmContract.matchId();
         console2.log("Current ID count:", cur_id, "\n");
 
-        MatchMaking.MatchDetail memory d = mmContract.getMatchDetail(cur_id - 1);
+        MatchMaking.MatchDetail memory d = mmContract.getMatchDetail(
+            cur_id - 1
+        );
         console2.log("Get match details of id", cur_id - 1);
         console2.log(d.player1);
         console2.log(d.player2);

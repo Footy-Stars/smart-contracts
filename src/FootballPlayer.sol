@@ -15,14 +15,11 @@ contract FootballPlayer is ERC721, ERC721URIStorage {
 
     constructor() ERC721("FootballPlayer", "FTS") {}
 
-    function safeMint() external {
+    function safeMint(string memory uri) external {
         address sender = msg.sender;
         uint256 tokenId = _nextTokenId++;
         _safeMint(sender, tokenId);
-        _setTokenURI(
-            tokenId,
-            "https://nftstorage.link/ipfs/bafybeidexodcpjaki3zymsrdxmar3goyzyez2vopj2tgg4mcw5quxexhpy/"
-        );
+        _setTokenURI(tokenId, uri);
         emit Minted(sender, tokenId);
     }
 
